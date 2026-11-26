@@ -1,4 +1,16 @@
 #include <GL/freeglut.h>
+#include <chrono>
+
+// Vehicle positions
+float car1Y = 80.0f;
+float car2Y = 520.0f;
+
+// Vehicle speeds (units per second)
+float car1Speed = 100.0f;
+float car2Speed = 80.0f;
+
+// Time of the previous update
+auto lastUpdateTime = std::chrono::steady_clock::now();
 
 void drawRectangle(float x1, float y1, float x2, float y2)
 {
@@ -129,11 +141,11 @@ void display()
             540, 230 + offset);
     }
 
-    // Normal-sized red car traveling north
-    drawCar(450.0f, 80.0f, 0.0f, 1.0f);
+    // Northbound vehicle
+    drawCar(450.0f, car1Y, 0.0f, 1.0f);
 
-    // Smaller red car traveling south
-    drawCar(350.0f, 520.0f, 180.0f, 0.75f);
+    // Southbound vehicle
+    drawCar(350.0f, car2Y, 180.0f, 0.75f);
 
     glutSwapBuffers();
 }
@@ -157,6 +169,42 @@ void reshape(int width, int height)
     glLoadIdentity();
 }
 
+void update(int value)
+{
+    // Calculate elapsed time
+    auto currentTime = std::chrono::steady_clock::now();
+
+    std::chrono::duration<float> elapsed =
+        currentTime - lastUpdateTime;
+
+    float deltaTime = elapsed.count();
+
+    lastUpdateTime = currentTime;
+
+    // Prevent unusually large movement jumps
+    if (deltaTime > 0.05f)
+        deltaTime = 0.05f;
+
+    // Move the northbound car upward
+    car1Y += car1Speed * deltaTime;
+
+    // Move the southbound car downward
+    car2Y -= car2Speed * deltaTime;
+
+    // Restart cars after leaving the screen
+    if (car1Y > 650.0f)
+        car1Y = -50.0f;
+
+    if (car2Y < -50.0f)
+        car2Y = 650.0f;
+
+    // Request a new frame
+    glutPostRedisplay();
+
+    // Schedule the next update
+    glutTimerFunc(16, update, 0);
+}
+
 int main(int argc, char** argv)
 {
     // Initialize FreeGLUT
@@ -177,6 +225,10 @@ int main(int argc, char** argv)
     // Register drawing and resizing callbacks
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
+
+    // Start vehicle animation
+	lastUpdateTime = std::chrono::steady_clock::now();
+	glutTimerFunc(16, update, 0);
 
     // Start the application loop
     glutMainLoop();
