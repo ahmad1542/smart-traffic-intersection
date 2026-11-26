@@ -53,6 +53,21 @@ void display()
     drawRectangle(500, 200, 800, 203);
     drawRectangle(500, 397, 800, 400);
 
+    // Draw stop lines for right-hand traffic
+    glColor3f(1.0f, 1.0f, 1.0f);
+
+    // North approach - vehicles moving south
+    drawRectangle(305, 450, 395, 455);
+
+    // South approach - vehicles moving north
+    drawRectangle(405, 145, 495, 150);
+
+    // West approach - vehicles moving east
+    drawRectangle(245, 205, 250, 295);
+
+    // East approach - vehicles moving west
+    drawRectangle(550, 305, 555, 395);
+
     // 4. Draw pedestrian crossings
     for (int i = 0; i < 6; i++)
     {
