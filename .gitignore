@@ -1,0 +1,43 @@
+
+# Visual Studio temporary files
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+*.VC.VC.opendb
+
+# Compiled output
+x64/
+x86/
+Debug/
+Release/
+bin/
+obj/
+
+# Intermediate build files
+*.obj
+*.pch
+*.pdb
+*.ilk
+*.idb
+*.ipch
+*.tlog
+*.lastbuildstate
+*.log
+
+# Executables and libraries
+*.exe
+*.dll
+*.lib
+*.exp
+
+# CMake build directories
+build/
+out/
+CMakeFiles/
+CMakeCache.txt
+
+# Operating system files
+Thumbs.db
+.DS_Store
