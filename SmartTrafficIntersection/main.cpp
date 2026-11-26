@@ -6,8 +6,14 @@
 float car1Y = 80.0f;
 float car2Y = 520.0f;
 
+float car3X = 80.0f;   // West approach, traveling east
+float car4X = 720.0f;  // East approach, traveling west
+
 const float NORTHBOUND_STOP_Y = 105.0f;
 const float SOUTHBOUND_STOP_Y = 485.0f;
+
+const float EASTBOUND_STOP_X = 205.0f;
+const float WESTBOUND_STOP_X = 595.0f;
 
 enum class TrafficPhase
 {
@@ -29,6 +35,9 @@ const float ALL_RED_DURATION = 1.0f;
 // Vehicle speeds (units per second)
 float car1Speed = 100.0f;
 float car2Speed = 80.0f;
+
+float car3Speed = 90.0f;
+float car4Speed = 70.0f;
 
 // Time of the previous update
 auto lastUpdateTime = std::chrono::steady_clock::now();
@@ -220,6 +229,12 @@ void display()
     // Southbound vehicle
     drawCar(350.0f, car2Y, 180.0f, 0.75f);
 
+    // Eastbound car - traveling from west to east
+    drawCar(car3X, 250.0f, 270.0f, 1.0f);
+
+    // Westbound car - traveling from east to west
+    drawCar(car4X, 350.0f, 90.0f, 1.0f);
+
     // North and south traffic lights
     drawTrafficLight(285.0f, 460.0f, true);
     drawTrafficLight(515.0f, 140.0f, true);
@@ -311,39 +326,78 @@ bool canEnterIntersection()
     return currentPhase == TrafficPhase::NS_GREEN;
 }
 
+bool canEastWestEnter()
+{
+    return currentPhase == TrafficPhase::EW_GREEN;
+}
+
+
 void updateVehicles(float deltaTime)
 {
-    // Calculate proposed vehicle positions
+    // Check whether vehicles are already in the intersection.
+    // Include the vehicle's approximate half-length (35 units).
+    bool nsInsideIntersection =
+        (car1Y + 35.0f > 200.0f && car1Y - 35.0f < 400.0f) ||
+        (car2Y + 26.25f > 200.0f && car2Y - 26.25f < 400.0f);
+
+    bool ewInsideIntersection =
+        (car3X + 35.0f > 300.0f && car3X - 35.0f < 500.0f) ||
+        (car4X + 35.0f > 300.0f && car4X - 35.0f < 500.0f);
+
+    // A direction can enter only when its signal is green
+    // and no conflicting vehicle is still crossing.
+    bool nsCanEnter = canEnterIntersection() &&
+        !ewInsideIntersection;
+
+    bool ewCanEnter = canEastWestEnter() &&
+        !nsInsideIntersection;
+
+    // Calculate new positions
     float nextCar1Y = car1Y + car1Speed * deltaTime;
     float nextCar2Y = car2Y - car2Speed * deltaTime;
+    float nextCar3X = car3X + car3Speed * deltaTime;
+    float nextCar4X = car4X - car4Speed * deltaTime;
 
-    // Stop vehicles before their stop lines
-    if (!canEnterIntersection())
+    // North-South stopping
+    if (!nsCanEnter)
     {
-        // Northbound car
         if (car1Y <= NORTHBOUND_STOP_Y)
-        {
             nextCar1Y = std::min(nextCar1Y, NORTHBOUND_STOP_Y);
-        }
 
-        // Southbound car
         if (car2Y >= SOUTHBOUND_STOP_Y)
-        {
             nextCar2Y = std::max(nextCar2Y, SOUTHBOUND_STOP_Y);
-        }
     }
 
-    // Apply new positions
+    // East-West stopping
+    if (!ewCanEnter)
+    {
+        if (car3X <= EASTBOUND_STOP_X)
+            nextCar3X = std::min(nextCar3X, EASTBOUND_STOP_X);
+
+        if (car4X >= WESTBOUND_STOP_X)
+            nextCar4X = std::max(nextCar4X, WESTBOUND_STOP_X);
+    }
+
+    // Apply updated positions
     car1Y = nextCar1Y;
     car2Y = nextCar2Y;
+    car3X = nextCar3X;
+    car4X = nextCar4X;
 
-    // Restart cars after leaving the screen
+    // Restart vehicles after leaving the screen
     if (car1Y > 650.0f)
         car1Y = -50.0f;
 
     if (car2Y < -50.0f)
         car2Y = 650.0f;
+
+    if (car3X > 850.0f)
+        car3X = -50.0f;
+
+    if (car4X < -50.0f)
+        car4X = 850.0f;
 }
+
 
 void update(int value)
 {
