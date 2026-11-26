@@ -10,9 +10,48 @@ void drawRectangle(float x1, float y1, float x2, float y2)
     glEnd();
 }
 
+void drawCar(float x, float y, float angle, float scale)
+{
+    glPushMatrix();
+
+    // Position and rotate the entire car
+    glTranslatef(x, y, 0.0f);
+    glRotatef(angle, 0.0f, 0.0f, 1.0f);
+    glScalef(scale, scale, 1.0f);
+
+    // Wheels
+    glColor3f(0.08f, 0.08f, 0.08f);
+
+    drawRectangle(-20, -28, -14, -12);
+    drawRectangle(14, -28, 20, -12);
+    drawRectangle(-20, 12, -14, 28);
+    drawRectangle(14, 12, 20, 28);
+
+    // Car body
+    glColor3f(0.90f, 0.15f, 0.15f);
+    drawRectangle(-16, -35, 16, 35);
+
+    // Front windshield
+    glColor3f(0.55f, 0.80f, 0.95f);
+    drawRectangle(-12, 10, 12, 25);
+
+    // Rear windshield
+    drawRectangle(-12, -25, 12, -12);
+
+    // Headlights
+    glColor3f(1.0f, 0.95f, 0.55f);
+    drawRectangle(-12, 31, -5, 35);
+    drawRectangle(5, 31, 12, 35);
+
+    // Rear lights
+    glColor3f(0.55f, 0.02f, 0.02f);
+    drawRectangle(-12, -35, -5, -32);
+    drawRectangle(5, -35, 12, -32);
+
+    glPopMatrix();
+}
 
 // Draw the entire scene
-
 void display()
 {
     glClear(GL_COLOR_BUFFER_BIT);
@@ -89,6 +128,12 @@ void display()
         drawRectangle(510, 215 + offset,
             540, 230 + offset);
     }
+
+    // Normal-sized red car traveling north
+    drawCar(450.0f, 80.0f, 0.0f, 1.0f);
+
+    // Smaller red car traveling south
+    drawCar(350.0f, 520.0f, 180.0f, 0.75f);
 
     glutSwapBuffers();
 }
