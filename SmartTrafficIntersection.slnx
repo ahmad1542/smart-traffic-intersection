@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="SmartTrafficIntersection/SmartTrafficIntersection.vcxproj" />
+  <Project Path="SmartTrafficIntersection/SmartTrafficIntersection.vcxproj" Id="71eaa734-68c9-4ede-8dc6-282f915dde07" />
 </Solution>

@@ -1,26 +1,83 @@
-
 #include <GL/freeglut.h>
 
+void drawRectangle(float x1, float y1, float x2, float y2)
+{
+    glBegin(GL_QUADS);
+    glVertex2f(x1, y1);
+    glVertex2f(x2, y1);
+    glVertex2f(x2, y2);
+    glVertex2f(x1, y2);
+    glEnd();
+}
+
+
 // Draw the entire scene
+
 void display()
 {
-    // Clear the window
     glClear(GL_COLOR_BUFFER_BIT);
+    glLoadIdentity();
 
-    // Set the road color (dark gray)
-    glColor3f(0.2f, 0.2f, 0.2f);
+    // 1. Draw the roads
+    glColor3f(0.20f, 0.22f, 0.25f);
 
-    // Draw a vertical road
-    glBegin(GL_QUADS);
-    glVertex2f(350.0f, 0.0f);
-    glVertex2f(450.0f, 0.0f);
-    glVertex2f(450.0f, 600.0f);
-    glVertex2f(350.0f, 600.0f);
-    glEnd();
+    // Vertical road
+    drawRectangle(300, 0, 500, 600);
 
-    // Display the rendered image
+    // Horizontal road
+    drawRectangle(0, 200, 800, 400);
+
+    // 2. Draw yellow center lines
+    glColor3f(1.0f, 0.85f, 0.20f);
+
+    // Vertical road center lines
+    drawRectangle(398, 0, 402, 200);
+    drawRectangle(398, 400, 402, 600);
+
+    // Horizontal road center lines
+    drawRectangle(0, 298, 300, 302);
+    drawRectangle(500, 298, 800, 302);
+
+    // 3. Draw white road boundaries
+    glColor3f(1.0f, 1.0f, 1.0f);
+
+    // Vertical boundaries
+    drawRectangle(300, 0, 303, 200);
+    drawRectangle(497, 0, 500, 200);
+    drawRectangle(300, 400, 303, 600);
+    drawRectangle(497, 400, 500, 600);
+
+    // Horizontal boundaries
+    drawRectangle(0, 200, 300, 203);
+    drawRectangle(0, 397, 300, 400);
+    drawRectangle(500, 200, 800, 203);
+    drawRectangle(500, 397, 800, 400);
+
+    // 4. Draw pedestrian crossings
+    for (int i = 0; i < 6; i++)
+    {
+        float offset = i * 30.0f;
+
+        // North crossing
+        drawRectangle(315 + offset, 410,
+            330 + offset, 440);
+
+        // South crossing
+        drawRectangle(315 + offset, 160,
+            330 + offset, 190);
+
+        // West crossing
+        drawRectangle(260, 215 + offset,
+            290, 230 + offset);
+
+        // East crossing
+        drawRectangle(510, 215 + offset,
+            540, 230 + offset);
+    }
+
     glutSwapBuffers();
 }
+
 
 // Configure the 2D coordinate system
 void reshape(int width, int height)
