@@ -1,9 +1,13 @@
 #include <GL/freeglut.h>
 #include <chrono>
+#include <algorithm>
 
 // Vehicle positions
 float car1Y = 80.0f;
 float car2Y = 520.0f;
+
+const float NORTHBOUND_STOP_Y = 105.0f;
+const float SOUTHBOUND_STOP_Y = 485.0f;
 
 enum class TrafficPhase
 {
@@ -302,6 +306,45 @@ void updateTrafficLights(float deltaTime)
     }
 }
 
+bool canEnterIntersection()
+{
+    return currentPhase == TrafficPhase::NS_GREEN;
+}
+
+void updateVehicles(float deltaTime)
+{
+    // Calculate proposed vehicle positions
+    float nextCar1Y = car1Y + car1Speed * deltaTime;
+    float nextCar2Y = car2Y - car2Speed * deltaTime;
+
+    // Stop vehicles before their stop lines
+    if (!canEnterIntersection())
+    {
+        // Northbound car
+        if (car1Y <= NORTHBOUND_STOP_Y)
+        {
+            nextCar1Y = std::min(nextCar1Y, NORTHBOUND_STOP_Y);
+        }
+
+        // Southbound car
+        if (car2Y >= SOUTHBOUND_STOP_Y)
+        {
+            nextCar2Y = std::max(nextCar2Y, SOUTHBOUND_STOP_Y);
+        }
+    }
+
+    // Apply new positions
+    car1Y = nextCar1Y;
+    car2Y = nextCar2Y;
+
+    // Restart cars after leaving the screen
+    if (car1Y > 650.0f)
+        car1Y = -50.0f;
+
+    if (car2Y < -50.0f)
+        car2Y = 650.0f;
+}
+
 void update(int value)
 {
     // Calculate elapsed time
@@ -321,18 +364,8 @@ void update(int value)
     // Update the automatic traffic light controller
     updateTrafficLights(deltaTime);
     
-    // Move the northbound car upward
-    car1Y += car1Speed * deltaTime;
-
-    // Move the southbound car downward
-    car2Y -= car2Speed * deltaTime;
-
-    // Restart cars after leaving the screen
-    if (car1Y > 650.0f)
-        car1Y = -50.0f;
-
-    if (car2Y < -50.0f)
-        car2Y = 650.0f;
+    // Update vehicle positions
+    updateVehicles(deltaTime);
 
     // Request a new frame
     glutPostRedisplay();
