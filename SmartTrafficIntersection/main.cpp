@@ -5,6 +5,23 @@
 float car1Y = 80.0f;
 float car2Y = 520.0f;
 
+enum class TrafficPhase
+{
+    NS_GREEN,
+    NS_YELLOW,
+    ALL_RED_TO_EW,
+    EW_GREEN,
+    EW_YELLOW,
+    ALL_RED_TO_NS
+};
+
+TrafficPhase currentPhase = TrafficPhase::NS_GREEN;
+float phaseTimer = 0.0f;
+
+const float GREEN_DURATION = 8.0f;
+const float YELLOW_DURATION = 2.0f;
+const float ALL_RED_DURATION = 1.0f;
+
 // Vehicle speeds (units per second)
 float car1Speed = 100.0f;
 float car2Speed = 80.0f;
@@ -59,6 +76,58 @@ void drawCar(float x, float y, float angle, float scale)
     glColor3f(0.55f, 0.02f, 0.02f);
     drawRectangle(-12, -35, -5, -32);
     drawRectangle(5, -35, 12, -32);
+
+    glPopMatrix();
+}
+
+void drawTrafficLight(float x, float y, bool vertical)
+{
+    glPushMatrix();
+
+    glTranslatef(x, y, 0.0f);
+
+    // Rotate the traffic light if needed
+    if (!vertical)
+        glRotatef(90.0f, 0.0f, 0.0f, 1.0f);
+
+    // Traffic light housing
+    glColor3f(0.08f, 0.08f, 0.08f);
+    drawRectangle(-10, -28, 10, 28);
+
+    bool red = false;
+    bool yellow = false;
+    bool green = false;
+
+    // Determine which light is active
+    if (vertical)
+    {
+        red = currentPhase != TrafficPhase::NS_GREEN &&
+            currentPhase != TrafficPhase::NS_YELLOW;
+
+        yellow = currentPhase == TrafficPhase::NS_YELLOW;
+        green = currentPhase == TrafficPhase::NS_GREEN;
+    }
+    else
+    {
+        red = currentPhase != TrafficPhase::EW_GREEN &&
+            currentPhase != TrafficPhase::EW_YELLOW;
+
+        yellow = currentPhase == TrafficPhase::EW_YELLOW;
+        green = currentPhase == TrafficPhase::EW_GREEN;
+    }
+
+    // Red indicator
+    glColor3f(red ? 1.0f : 0.25f, 0.0f, 0.0f);
+    drawRectangle(-7, 11, 7, 23);
+
+    // Yellow indicator
+    glColor3f(yellow ? 1.0f : 0.25f,
+        yellow ? 0.85f : 0.20f, 0.0f);
+    drawRectangle(-7, -6, 7, 6);
+
+    // Green indicator
+    glColor3f(0.0f, green ? 1.0f : 0.20f, 0.0f);
+    drawRectangle(-7, -23, 7, -11);
 
     glPopMatrix();
 }
@@ -147,6 +216,14 @@ void display()
     // Southbound vehicle
     drawCar(350.0f, car2Y, 180.0f, 0.75f);
 
+    // North and south traffic lights
+    drawTrafficLight(285.0f, 460.0f, true);
+    drawTrafficLight(515.0f, 140.0f, true);
+
+    // East and west traffic lights
+    drawTrafficLight(240.0f, 415.0f, false);
+    drawTrafficLight(560.0f, 185.0f, false);
+
     glutSwapBuffers();
 }
 
@@ -169,6 +246,62 @@ void reshape(int width, int height)
     glLoadIdentity();
 }
 
+void updateTrafficLights(float deltaTime)
+{
+    phaseTimer += deltaTime;
+
+    switch (currentPhase)
+    {
+    case TrafficPhase::NS_GREEN:
+        if (phaseTimer >= GREEN_DURATION)
+        {
+            currentPhase = TrafficPhase::NS_YELLOW;
+            phaseTimer = 0.0f;
+        }
+        break;
+
+    case TrafficPhase::NS_YELLOW:
+        if (phaseTimer >= YELLOW_DURATION)
+        {
+            currentPhase = TrafficPhase::ALL_RED_TO_EW;
+            phaseTimer = 0.0f;
+        }
+        break;
+
+    case TrafficPhase::ALL_RED_TO_EW:
+        if (phaseTimer >= ALL_RED_DURATION)
+        {
+            currentPhase = TrafficPhase::EW_GREEN;
+            phaseTimer = 0.0f;
+        }
+        break;
+
+    case TrafficPhase::EW_GREEN:
+        if (phaseTimer >= GREEN_DURATION)
+        {
+            currentPhase = TrafficPhase::EW_YELLOW;
+            phaseTimer = 0.0f;
+        }
+        break;
+
+    case TrafficPhase::EW_YELLOW:
+        if (phaseTimer >= YELLOW_DURATION)
+        {
+            currentPhase = TrafficPhase::ALL_RED_TO_NS;
+            phaseTimer = 0.0f;
+        }
+        break;
+
+    case TrafficPhase::ALL_RED_TO_NS:
+        if (phaseTimer >= ALL_RED_DURATION)
+        {
+            currentPhase = TrafficPhase::NS_GREEN;
+            phaseTimer = 0.0f;
+        }
+        break;
+    }
+}
+
 void update(int value)
 {
     // Calculate elapsed time
@@ -185,6 +318,9 @@ void update(int value)
     if (deltaTime > 0.05f)
         deltaTime = 0.05f;
 
+    // Update the automatic traffic light controller
+    updateTrafficLights(deltaTime);
+    
     // Move the northbound car upward
     car1Y += car1Speed * deltaTime;
 
