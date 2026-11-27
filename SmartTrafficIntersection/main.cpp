@@ -32,10 +32,16 @@ std::vector<Vehicle> vehicles;
 // Maximum number of active vehicles
 const int MAX_VEHICLES = 30;
 
-// Time between spawning attempts
-const float SPAWN_INTERVAL = 1.5f;
+enum class TrafficDensity
+{
+	Low,
+	Normal,
+	High
+};
 
-// Time elapsed since the last spawn
+TrafficDensity currentDensity = TrafficDensity::Normal;
+
+float spawnInterval = 1.5f;
 float spawnTimer = 0.0f;
 
 // Select which direction spawns next
@@ -183,6 +189,44 @@ void drawTrafficLight(float x, float y, bool vertical)
 	glPopMatrix();
 }
 
+void drawText(float x, float y, const char* text)
+{
+	glRasterPos2f(x, y);
+
+	for (const char* character = text; *character; ++character)
+	{
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *character);
+	}
+}
+
+void drawDensityIndicator()
+{
+	const char* densityText = "";
+
+	switch (currentDensity)
+	{
+	case TrafficDensity::Low:
+		densityText = "Traffic Density: LOW";
+		break;
+
+	case TrafficDensity::Normal:
+		densityText = "Traffic Density: NORMAL";
+		break;
+
+	case TrafficDensity::High:
+		densityText = "Traffic Density: HIGH";
+		break;
+	}
+
+	// Dark background panel
+	glColor3f(0.12f, 0.16f, 0.20f);
+	drawRectangle(10.0f, 555.0f, 230.0f, 590.0f);
+
+	// White text
+	glColor3f(1.0f, 1.0f, 1.0f);
+	drawText(20.0f, 568.0f, densityText);
+}
+
 // Draw the entire scene
 void display()
 {
@@ -273,6 +317,9 @@ void display()
 	// East and west traffic lights
 	drawTrafficLight(240.0f, 415.0f, false);
 	drawTrafficLight(560.0f, 185.0f, false);
+	
+	// Draw the traffic density indicator
+	drawDensityIndicator();
 
 	glutSwapBuffers();
 }
@@ -527,13 +574,36 @@ void spawnVehicle()
 	vehicles.push_back(car);
 }
 
+void setTrafficDensity(TrafficDensity density)
+{
+	currentDensity = density;
+
+	switch (density)
+	{
+	case TrafficDensity::Low:
+		spawnInterval = 3.0f;
+		break;
+
+	case TrafficDensity::Normal:
+		spawnInterval = 1.5f;
+		break;
+
+	case TrafficDensity::High:
+		spawnInterval = 0.7f;
+		break;
+	}
+
+	// Restart the countdown when changing density
+	spawnTimer = 0.0f;
+}
+
 void updateSpawning(float deltaTime)
 {
 	spawnTimer += deltaTime;
 
-	if (spawnTimer >= SPAWN_INTERVAL)
+	if (spawnTimer >= spawnInterval)
 	{
-		spawnTimer -= SPAWN_INTERVAL;
+		spawnTimer -= spawnInterval;
 		spawnVehicle();
 	}
 }
@@ -708,6 +778,30 @@ void update(int value)
 	glutTimerFunc(16, update, 0);
 }
 
+void handleKeyboard(unsigned char key, int x, int y)
+{
+	switch (key)
+	{
+	case '1':
+		setTrafficDensity(TrafficDensity::Low);
+		break;
+
+	case '2':
+		setTrafficDensity(TrafficDensity::Normal);
+		break;
+
+	case '3':
+		setTrafficDensity(TrafficDensity::High);
+		break;
+
+	case 27:
+		glutLeaveMainLoop();
+		break;
+	}
+
+	glutPostRedisplay();
+}
+
 int main(int argc, char** argv)
 {
 	// Initialize FreeGLUT
@@ -728,6 +822,7 @@ int main(int argc, char** argv)
 	// Register drawing and resizing callbacks
 	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);
+	glutKeyboardFunc(handleKeyboard);
 
 	// Start vehicle animation
 	lastUpdateTime = std::chrono::steady_clock::now();
