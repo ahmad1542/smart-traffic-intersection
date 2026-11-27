@@ -1,13 +1,49 @@
 #include <GL/freeglut.h>
 #include <chrono>
 #include <algorithm>
+#include <vector>
 
-// Vehicle positions
-float car1Y = 80.0f;
-float car2Y = 520.0f;
+enum class Direction
+{
+    North,
+    South,
+    East,
+    West
+};
 
-float car3X = 80.0f;   // West approach, traveling east
-float car4X = 720.0f;  // East approach, traveling west
+struct Vehicle
+{
+    float x;
+    float y;
+    float speed;
+    float scale;
+    float angle;
+
+    Direction direction;
+
+    float red;
+    float green;
+    float blue;
+};
+
+std::vector<Vehicle> vehicles =
+{
+    // Northbound
+    { 450.0f, 80.0f, 100.0f, 1.0f, 0.0f,
+      Direction::North, 0.9f, 0.15f, 0.15f },
+
+      // Southbound
+      { 350.0f, 520.0f, 80.0f, 0.75f, 180.0f,
+        Direction::South, 0.2f, 0.5f, 0.9f },
+
+        // Eastbound
+        { 80.0f, 250.0f, 90.0f, 1.0f, 270.0f,
+          Direction::East, 0.9f, 0.7f, 0.2f },
+
+          // Westbound
+          { 720.0f, 350.0f, 70.0f, 1.0f, 90.0f,
+            Direction::West, 0.6f, 0.3f, 0.8f }
+};
 
 const float NORTHBOUND_STOP_Y = 105.0f;
 const float SOUTHBOUND_STOP_Y = 485.0f;
@@ -52,14 +88,14 @@ void drawRectangle(float x1, float y1, float x2, float y2)
     glEnd();
 }
 
-void drawCar(float x, float y, float angle, float scale)
+void drawCar(const Vehicle& car)
 {
     glPushMatrix();
 
     // Position and rotate the entire car
-    glTranslatef(x, y, 0.0f);
-    glRotatef(angle, 0.0f, 0.0f, 1.0f);
-    glScalef(scale, scale, 1.0f);
+    glTranslatef(car.x, car.y, 0.0f);
+    glRotatef(car.angle, 0.0f, 0.0f, 1.0f);
+    glScalef(car.scale, car.scale, 1.0f);
 
     // Wheels
     glColor3f(0.08f, 0.08f, 0.08f);
@@ -70,7 +106,7 @@ void drawCar(float x, float y, float angle, float scale)
     drawRectangle(14, 12, 20, 28);
 
     // Car body
-    glColor3f(0.90f, 0.15f, 0.15f);
+    glColor3f(car.red, car.green, car.blue);
     drawRectangle(-16, -35, 16, 35);
 
     // Front windshield
@@ -223,17 +259,10 @@ void display()
             540, 230 + offset);
     }
 
-    // Northbound vehicle
-    drawCar(450.0f, car1Y, 0.0f, 1.0f);
-
-    // Southbound vehicle
-    drawCar(350.0f, car2Y, 180.0f, 0.75f);
-
-    // Eastbound car - traveling from west to east
-    drawCar(car3X, 250.0f, 270.0f, 1.0f);
-
-    // Westbound car - traveling from east to west
-    drawCar(car4X, 350.0f, 90.0f, 1.0f);
+	for (const Vehicle& car : vehicles)
+	{
+		drawCar(car);
+	}
 
     // North and south traffic lights
     drawTrafficLight(285.0f, 460.0f, true);
@@ -331,73 +360,126 @@ bool canEastWestEnter()
     return currentPhase == TrafficPhase::EW_GREEN;
 }
 
-
 void updateVehicles(float deltaTime)
 {
-    // Check whether vehicles are already in the intersection.
-    // Include the vehicle's approximate half-length (35 units).
-    bool nsInsideIntersection =
-        (car1Y + 35.0f > 200.0f && car1Y - 35.0f < 400.0f) ||
-        (car2Y + 26.25f > 200.0f && car2Y - 26.25f < 400.0f);
+    // Check if any vehicle is crossing the intersection
+    bool nsInsideIntersection = false;
+    bool ewInsideIntersection = false;
 
-    bool ewInsideIntersection =
-        (car3X + 35.0f > 300.0f && car3X - 35.0f < 500.0f) ||
-        (car4X + 35.0f > 300.0f && car4X - 35.0f < 500.0f);
-
-    // A direction can enter only when its signal is green
-    // and no conflicting vehicle is still crossing.
-    bool nsCanEnter = canEnterIntersection() &&
-        !ewInsideIntersection;
-
-    bool ewCanEnter = canEastWestEnter() &&
-        !nsInsideIntersection;
-
-    // Calculate new positions
-    float nextCar1Y = car1Y + car1Speed * deltaTime;
-    float nextCar2Y = car2Y - car2Speed * deltaTime;
-    float nextCar3X = car3X + car3Speed * deltaTime;
-    float nextCar4X = car4X - car4Speed * deltaTime;
-
-    // North-South stopping
-    if (!nsCanEnter)
+    for (const Vehicle& car : vehicles)
     {
-        if (car1Y <= NORTHBOUND_STOP_Y)
-            nextCar1Y = std::min(nextCar1Y, NORTHBOUND_STOP_Y);
+        float halfLength = 35.0f * car.scale;
 
-        if (car2Y >= SOUTHBOUND_STOP_Y)
-            nextCar2Y = std::max(nextCar2Y, SOUTHBOUND_STOP_Y);
+        if (car.direction == Direction::North ||
+            car.direction == Direction::South)
+        {
+            if (car.y + halfLength > 200.0f &&
+                car.y - halfLength < 400.0f)
+            {
+                nsInsideIntersection = true;
+            }
+        }
+        else
+        {
+            if (car.x + halfLength > 300.0f &&
+                car.x - halfLength < 500.0f)
+            {
+                ewInsideIntersection = true;
+            }
+        }
     }
 
-    // East-West stopping
-    if (!ewCanEnter)
-    {
-        if (car3X <= EASTBOUND_STOP_X)
-            nextCar3X = std::min(nextCar3X, EASTBOUND_STOP_X);
+    bool nsCanEnter =
+        canEnterIntersection() && !ewInsideIntersection;
 
-        if (car4X >= WESTBOUND_STOP_X)
-            nextCar4X = std::max(nextCar4X, WESTBOUND_STOP_X);
+    bool ewCanEnter =
+        canEastWestEnter() && !nsInsideIntersection;
+
+    for (Vehicle& car : vehicles)
+    {
+        float movement = car.speed * deltaTime;
+        float halfLength = 35.0f * car.scale;
+        float safetyGap = 5.0f;
+
+        switch (car.direction)
+        {
+        case Direction::North:
+        {
+            float stopY = 145.0f - halfLength - safetyGap;
+            float nextY = car.y + movement;
+
+            if (!nsCanEnter && car.y <= stopY)
+                nextY = std::min(nextY, stopY);
+
+            car.y = nextY;
+            break;
+        }
+
+        case Direction::South:
+        {
+            float stopY = 455.0f + halfLength + safetyGap;
+            float nextY = car.y - movement;
+
+            if (!nsCanEnter && car.y >= stopY)
+                nextY = std::max(nextY, stopY);
+
+            car.y = nextY;
+            break;
+        }
+
+        case Direction::East:
+        {
+            float stopX = 245.0f - halfLength - safetyGap;
+            float nextX = car.x + movement;
+
+            if (!ewCanEnter && car.x <= stopX)
+                nextX = std::min(nextX, stopX);
+
+            car.x = nextX;
+            break;
+        }
+
+        case Direction::West:
+        {
+            float stopX = 555.0f + halfLength + safetyGap;
+            float nextX = car.x - movement;
+
+            if (!ewCanEnter && car.x >= stopX)
+                nextX = std::max(nextX, stopX);
+
+            car.x = nextX;
+            break;
+        }
+        }
     }
 
-    // Apply updated positions
-    car1Y = nextCar1Y;
-    car2Y = nextCar2Y;
-    car3X = nextCar3X;
-    car4X = nextCar4X;
+    // Temporarily restart vehicles after leaving the scene
+    for (Vehicle& car : vehicles)
+    {
+        switch (car.direction)
+        {
+        case Direction::North:
+            if (car.y > 650.0f)
+                car.y = -50.0f;
+            break;
 
-    // Restart vehicles after leaving the screen
-    if (car1Y > 650.0f)
-        car1Y = -50.0f;
+        case Direction::South:
+            if (car.y < -50.0f)
+                car.y = 650.0f;
+            break;
 
-    if (car2Y < -50.0f)
-        car2Y = 650.0f;
+        case Direction::East:
+            if (car.x > 850.0f)
+                car.x = -50.0f;
+            break;
 
-    if (car3X > 850.0f)
-        car3X = -50.0f;
-
-    if (car4X < -50.0f)
-        car4X = 850.0f;
+        case Direction::West:
+            if (car.x < -50.0f)
+                car.x = 850.0f;
+            break;
+        }
+    }
 }
-
 
 void update(int value)
 {
