@@ -76,6 +76,24 @@ const float GREEN_DURATION = 8.0f;
 const float YELLOW_DURATION = 2.0f;
 const float ALL_RED_DURATION = 1.0f;
 
+enum class TrafficMode
+{
+	Automatic,
+	Manual
+};
+
+enum class SignalGroup
+{
+	NorthSouth,
+	EastWest
+};
+
+TrafficMode currentMode = TrafficMode::Automatic;
+
+SignalGroup requestedGroup = SignalGroup::NorthSouth;
+
+const float MIN_MANUAL_GREEN = 3.0f;
+
 // Vehicle speeds (units per second)
 float car1Speed = 100.0f;
 float car2Speed = 80.0f;
@@ -227,6 +245,28 @@ void drawDensityIndicator()
 	drawText(20.0f, 568.0f, densityText);
 }
 
+void drawTrafficModeIndicator()
+{
+	const char* modeText;
+
+	if (currentMode == TrafficMode::Automatic)
+	{
+		modeText = "Traffic Mode: AUTOMATIC";
+	}
+	else
+	{
+		modeText = "Traffic Mode: MANUAL";
+	}
+
+	// Dark panel
+	glColor3f(0.12f, 0.16f, 0.20f);
+	drawRectangle(10.0f, 510.0f, 230.0f, 545.0f);
+
+	// White text
+	glColor3f(1.0f, 1.0f, 1.0f);
+	drawText(20.0f, 523.0f, modeText);
+}
+
 // Draw the entire scene
 void display()
 {
@@ -321,6 +361,8 @@ void display()
 	// Draw the traffic density indicator
 	drawDensityIndicator();
 
+	drawTrafficModeIndicator();
+
 	glutSwapBuffers();
 }
 
@@ -343,6 +385,43 @@ void reshape(int width, int height)
 	glLoadIdentity();
 }
 
+void toggleTrafficMode()
+{
+	if (currentMode == TrafficMode::Automatic)
+	{
+		currentMode = TrafficMode::Manual;
+
+		// Keep the direction already active or
+		// scheduled by the current traffic phase.
+		switch (currentPhase)
+		{
+		case TrafficPhase::NS_GREEN:
+		case TrafficPhase::EW_YELLOW:
+		case TrafficPhase::ALL_RED_TO_NS:
+			requestedGroup = SignalGroup::NorthSouth;
+			break;
+
+		default:
+			requestedGroup = SignalGroup::EastWest;
+			break;
+		}
+	}
+	else
+	{
+		currentMode = TrafficMode::Automatic;
+	}
+}
+
+void requestTrafficSignal(SignalGroup group)
+{
+	// Manual requests are only allowed in manual mode.
+	if (currentMode != TrafficMode::Manual)
+		return;
+
+	// Store the requested direction.
+	requestedGroup = group;
+}
+
 void updateTrafficLights(float deltaTime)
 {
 	phaseTimer += deltaTime;
@@ -350,52 +429,84 @@ void updateTrafficLights(float deltaTime)
 	switch (currentPhase)
 	{
 	case TrafficPhase::NS_GREEN:
-		if (phaseTimer >= GREEN_DURATION)
+	{
+		if (currentMode == TrafficMode::Automatic)
+		{
+			if (phaseTimer >= GREEN_DURATION)
+			{
+				currentPhase = TrafficPhase::NS_YELLOW;
+				phaseTimer = 0.0f;
+			}
+		}
+		else if (
+			requestedGroup == SignalGroup::EastWest &&
+			phaseTimer >= MIN_MANUAL_GREEN)
 		{
 			currentPhase = TrafficPhase::NS_YELLOW;
 			phaseTimer = 0.0f;
 		}
 		break;
+	}
 
 	case TrafficPhase::NS_YELLOW:
+	{
 		if (phaseTimer >= YELLOW_DURATION)
 		{
 			currentPhase = TrafficPhase::ALL_RED_TO_EW;
 			phaseTimer = 0.0f;
 		}
 		break;
+	}
 
 	case TrafficPhase::ALL_RED_TO_EW:
+	{
 		if (phaseTimer >= ALL_RED_DURATION)
 		{
 			currentPhase = TrafficPhase::EW_GREEN;
 			phaseTimer = 0.0f;
 		}
 		break;
+	}
 
 	case TrafficPhase::EW_GREEN:
-		if (phaseTimer >= GREEN_DURATION)
+	{
+		if (currentMode == TrafficMode::Automatic)
+		{
+			if (phaseTimer >= GREEN_DURATION)
+			{
+				currentPhase = TrafficPhase::EW_YELLOW;
+				phaseTimer = 0.0f;
+			}
+		}
+		else if (
+			requestedGroup == SignalGroup::NorthSouth &&
+			phaseTimer >= MIN_MANUAL_GREEN)
 		{
 			currentPhase = TrafficPhase::EW_YELLOW;
 			phaseTimer = 0.0f;
 		}
 		break;
+	}
 
 	case TrafficPhase::EW_YELLOW:
+	{
 		if (phaseTimer >= YELLOW_DURATION)
 		{
 			currentPhase = TrafficPhase::ALL_RED_TO_NS;
 			phaseTimer = 0.0f;
 		}
 		break;
+	}
 
 	case TrafficPhase::ALL_RED_TO_NS:
+	{
 		if (phaseTimer >= ALL_RED_DURATION)
 		{
 			currentPhase = TrafficPhase::NS_GREEN;
 			phaseTimer = 0.0f;
 		}
 		break;
+	}
 	}
 }
 
@@ -792,6 +903,21 @@ void handleKeyboard(unsigned char key, int x, int y)
 
 	case '3':
 		setTrafficDensity(TrafficDensity::High);
+		break;
+
+	case 'm':
+	case 'M':
+		toggleTrafficMode();
+		break;
+
+	case 'n':
+	case 'N':
+		requestTrafficSignal(SignalGroup::NorthSouth);
+		break;
+
+	case 'e':
+	case 'E':
+		requestTrafficSignal(SignalGroup::EastWest);
 		break;
 
 	case 27:
