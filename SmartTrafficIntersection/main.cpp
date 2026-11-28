@@ -4,6 +4,7 @@
 #include <vector>
 #include <random>
 #include <cstdio>
+#include <cstring>
 
 enum class Direction
 {
@@ -140,6 +141,15 @@ const float MIN_SIMULATION_SPEED = 0.25f;
 const float MAX_SIMULATION_SPEED = 3.0f;
 const float SPEED_STEP = 0.25f;
 
+// Shared UI theme colors
+const float UI_BG_R = 0.12f;
+const float UI_BG_G = 0.16f;
+const float UI_BG_B = 0.20f;
+
+const float UI_TITLE_R = 0.50f;
+const float UI_TITLE_G = 0.90f;
+const float UI_TITLE_B = 0.65f;
+
 void drawRectangle(float x1, float y1, float x2, float y2)
 {
 	glBegin(GL_QUADS);
@@ -253,6 +263,44 @@ void drawText(float x, float y, const char* text)
 	}
 }
 
+void drawColoredText(
+	float x,
+	float y,
+	const char* text,
+	float red,
+	float green,
+	float blue)
+{
+	glColor3f(red, green, blue);
+
+	drawText(x, y, text);
+
+	// Restore default text color
+	glColor3f(1.0f, 1.0f, 1.0f);
+}
+
+void drawSignalStatusText(
+	float x,
+	float y,
+	const char* text)
+{
+	if (std::strstr(text, "GREEN") != nullptr)
+	{
+		drawColoredText(x, y, text,
+			0.25f, 0.90f, 0.45f);
+	}
+	else if (std::strstr(text, "YELLOW") != nullptr)
+	{
+		drawColoredText(x, y, text,
+			1.0f, 0.80f, 0.20f);
+	}
+	else
+	{
+		drawColoredText(x, y, text,
+			1.0f, 0.35f, 0.35f);
+	}
+}
+
 void drawDensityIndicator()
 {
 	const char* densityText = "";
@@ -359,11 +407,11 @@ void drawDashboard()
 	char text[100];
 
 	// Dashboard background
-	glColor3f(0.12f, 0.16f, 0.20f);
+	glColor3f(UI_BG_R, UI_BG_G, UI_BG_B);
 	drawRectangle(10.0f, 395.0f, 260.0f, 590.0f);
 
 	// Dashboard title
-	glColor3f(0.40f, 0.90f, 0.60f);
+	glColor3f(UI_TITLE_R, UI_TITLE_G, UI_TITLE_B);
 	drawText(20.0f, 574.0f, "TRAFFIC MONITOR");
 
 	// Reset text color to white
@@ -407,14 +455,14 @@ void drawDashboard()
 		"North-South: %s",
 		getSignalText(SignalGroup::NorthSouth));
 
-	drawText(20.0f, 526.0f, text);
+	drawSignalStatusText(20.0f, 526.0f, text);
 
 	// East-West signal
 	snprintf(text, sizeof(text),
 		"East-West: %s",
 		getSignalText(SignalGroup::EastWest));
 
-	drawText(20.0f, 510.0f, text);
+	drawSignalStatusText(20.0f, 510.0f, text);
 
 	// Allocated green duration
 	if (currentMode == TrafficMode::Automatic)
@@ -458,13 +506,27 @@ void drawDashboard()
 
 	drawText(20.0f, 446.0f, text);
 
-	// Simulation status
 	const char* status = isPaused ? "PAUSED" : "RUNNING";
 
 	snprintf(text, sizeof(text),
 		"Simulation: %s", status);
 
-	drawText(20.0f, 427.0f, text);
+	if (isPaused)
+	{
+		// Yellow for paused
+		drawColoredText(
+			20.0f, 427.0f, text,
+			1.0f, 0.80f, 0.20f
+		);
+	}
+	else
+	{
+		// Green for running
+		drawColoredText(
+			20.0f, 427.0f, text,
+			0.25f, 0.90f, 0.45f
+		);
+	}
 
 	// Simulation speed
 	snprintf(text, sizeof(text),
@@ -476,11 +538,11 @@ void drawDashboard()
 void drawControlsPanel()
 {
 	// Panel background
-	glColor3f(0.12f, 0.16f, 0.20f);
+	glColor3f(UI_BG_R, UI_BG_G, UI_BG_B);
 	drawRectangle(0.0f, 0.0f, 250.0f, 235.0f);
 
 	// Panel title
-	glColor3f(0.50f, 0.90f, 0.65f);
+	glColor3f(UI_TITLE_R, UI_TITLE_G, UI_TITLE_B);
 	drawText(12.0f, 215.0f, "KEYBOARD CONTROLS");
 
 	// Keyboard shortcuts
