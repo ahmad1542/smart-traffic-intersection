@@ -473,6 +473,76 @@ void drawDashboard()
 	drawText(20.0f, 409.0f, text);
 }
 
+void drawControlsPanel()
+{
+	// Panel background
+	glColor3f(0.12f, 0.16f, 0.20f);
+	drawRectangle(0.0f, 0.0f, 250.0f, 235.0f);
+
+	// Panel title
+	glColor3f(0.50f, 0.90f, 0.65f);
+	drawText(12.0f, 215.0f, "KEYBOARD CONTROLS");
+
+	// Keyboard shortcuts
+	glColor3f(1.0f, 1.0f, 1.0f);
+
+	drawText(12.0f, 192.0f, "1 / 2 / 3  - Traffic density");
+	drawText(12.0f, 173.0f, "M          - Auto / Manual");
+	drawText(12.0f, 154.0f, "N / E      - Request signal");
+	drawText(12.0f, 135.0f, "SPACE      - Pause / Resume");
+	drawText(12.0f, 116.0f, "[ / ]      - Simulation speed");
+	drawText(12.0f, 97.0f, "ARROWS     - Pan camera");
+	drawText(12.0f, 78.0f, "WHEEL      - Zoom camera");
+	drawText(12.0f, 59.0f, "C          - Reset camera");
+	drawText(12.0f, 40.0f, "R          - Reset simulation");
+}
+
+void drawControlsOverlay()
+{
+	glMatrixMode(GL_PROJECTION);
+	glPushMatrix();
+	glLoadIdentity();
+
+	// Use window coordinates
+	glOrtho(
+		0.0, windowWidth,
+		0.0, windowHeight,
+		-1.0, 1.0
+	);
+
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+	glLoadIdentity();
+
+	// Use the same scaling as our dashboard
+	const float uiScale = 1.3f;
+
+	const float panelWidth = 250.0f;
+	const float panelHeight = 235.0f;
+	const float margin = 10.0f;
+
+	// Upper-right corner
+	float panelX =
+		windowWidth - panelWidth * uiScale - margin;
+
+	float panelY =
+		windowHeight - panelHeight * uiScale - margin;
+
+	// Place and scale the panel
+	glTranslatef(panelX, panelY, 0.0f);
+	glScalef(uiScale, uiScale, 1.0f);
+
+	drawControlsPanel();
+
+	// Restore original camera transformations
+	glPopMatrix();
+
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+
+	glMatrixMode(GL_MODELVIEW);
+}
+
 void drawDashboardOverlay()
 {
 	// Save the world projection
@@ -601,8 +671,11 @@ void display()
 	drawTrafficLight(240.0f, 415.0f, false);
 	drawTrafficLight(560.0f, 185.0f, false);
 
-	// Draw dashboard independently of the camera
+	// Fixed dashboard in upper-left
 	drawDashboardOverlay();
+
+	// Fixed controls panel in upper-right
+	drawControlsOverlay();
 
 	glutSwapBuffers();
 }
