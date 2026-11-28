@@ -115,12 +115,19 @@ float car4Speed = 70.0f;
 // Time of the previous update
 auto lastUpdateTime = std::chrono::steady_clock::now();
 
-const float CAMERA_CENTER_X = 400.0f;
-const float CAMERA_CENTER_Y = 300.0f;
+const float DEFAULT_CAMERA_X = 400.0f;
+const float DEFAULT_CAMERA_Y = 300.0f;
+const float DEFAULT_CAMERA_ZOOM = 450.0f;
 
-// Original half-height was 300.
-// Increasing it to 450 zooms the camera out.
-const float CAMERA_HALF_HEIGHT = 450.0f;
+// Current camera state
+float cameraX = DEFAULT_CAMERA_X;
+float cameraY = DEFAULT_CAMERA_Y;
+float cameraZoom = DEFAULT_CAMERA_ZOOM;
+
+// Camera limits
+const float MIN_ZOOM = 300.0f;
+const float MAX_ZOOM = 520.0f;
+const float CAMERA_MOVE_SPEED = 35.0f;
 
 int windowWidth = 800;
 int windowHeight = 600;
@@ -578,9 +585,34 @@ void display()
 	glutSwapBuffers();
 }
 
+void updateCameraProjection()
+{
+	float aspect =
+		static_cast<float>(windowWidth) / windowHeight;
+
+	float halfWidth = cameraZoom * aspect;
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+
+	glOrtho(
+		cameraX - halfWidth,
+		cameraX + halfWidth,
+		cameraY - cameraZoom,
+		cameraY + cameraZoom,
+		-1.0, 1.0
+	);
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+}
+
 void reshape(int width, int height)
 {
-	if (height == 0)
+	if (width < 1)
+		width = 1;
+
+	if (height < 1)
 		height = 1;
 
 	windowWidth = width;
@@ -588,24 +620,7 @@ void reshape(int width, int height)
 
 	glViewport(0, 0, width, height);
 
-	float aspect =
-		static_cast<float>(width) / height;
-
-	float halfWidth = CAMERA_HALF_HEIGHT * aspect;
-
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-
-	glOrtho(
-		CAMERA_CENTER_X - halfWidth,
-		CAMERA_CENTER_X + halfWidth,
-		CAMERA_CENTER_Y - CAMERA_HALF_HEIGHT,
-		CAMERA_CENTER_Y + CAMERA_HALF_HEIGHT,
-		-1.0, 1.0
-	);
-
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
+	updateCameraProjection();
 }
 
 void toggleTrafficMode()
@@ -1221,11 +1236,77 @@ void handleKeyboard(unsigned char key, int x, int y)
 		requestTrafficSignal(SignalGroup::EastWest);
 		break;
 
+	case 'c':
+	case 'C':
+		cameraX = DEFAULT_CAMERA_X;
+		cameraY = DEFAULT_CAMERA_Y;
+		cameraZoom = DEFAULT_CAMERA_ZOOM;
+
+		updateCameraProjection();
+		break;
+
 	case 27:
 		glutLeaveMainLoop();
 		break;
 	}
 
+	glutPostRedisplay();
+}
+
+void handleMouseWheel(
+	int wheel,
+	int direction,
+	int x,
+	int y)
+{
+	if (direction > 0)
+	{
+		// Zoom in
+		cameraZoom *= 0.9f;
+	}
+	else if (direction < 0)
+	{
+		// Zoom out
+		cameraZoom *= 1.1f;
+	}
+
+	// Keep zoom within safe limits
+	cameraZoom = std::clamp(
+		cameraZoom,
+		MIN_ZOOM,
+		MAX_ZOOM
+	);
+
+	updateCameraProjection();
+	glutPostRedisplay();
+}
+
+void handleSpecialKeys(int key, int x, int y)
+{
+	switch (key)
+	{
+	case GLUT_KEY_UP:
+		cameraY += CAMERA_MOVE_SPEED;
+		break;
+
+	case GLUT_KEY_DOWN:
+		cameraY -= CAMERA_MOVE_SPEED;
+		break;
+
+	case GLUT_KEY_LEFT:
+		cameraX -= CAMERA_MOVE_SPEED;
+		break;
+
+	case GLUT_KEY_RIGHT:
+		cameraX += CAMERA_MOVE_SPEED;
+		break;
+	}
+
+	// Keep the camera near the intersection
+	cameraX = std::clamp(cameraX, 300.0f, 500.0f);
+	cameraY = std::clamp(cameraY, 200.0f, 400.0f);
+
+	updateCameraProjection();
 	glutPostRedisplay();
 }
 
@@ -1253,6 +1334,8 @@ int main(int argc, char** argv)
 	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);
 	glutKeyboardFunc(handleKeyboard);
+	glutMouseWheelFunc(handleMouseWheel);
+	glutSpecialFunc(handleSpecialKeys);
 
 	// Start vehicle animation
 	lastUpdateTime = std::chrono::steady_clock::now();
