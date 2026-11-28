@@ -132,6 +132,14 @@ const float CAMERA_MOVE_SPEED = 35.0f;
 int windowWidth = 800;
 int windowHeight = 600;
 
+bool isPaused = false;
+
+float simulationSpeed = 1.0f;
+
+const float MIN_SIMULATION_SPEED = 0.25f;
+const float MAX_SIMULATION_SPEED = 3.0f;
+const float SPEED_STEP = 0.25f;
+
 void drawRectangle(float x1, float y1, float x2, float y2)
 {
 	glBegin(GL_QUADS);
@@ -352,7 +360,7 @@ void drawDashboard()
 
 	// Dashboard background
 	glColor3f(0.12f, 0.16f, 0.20f);
-	drawRectangle(10.0f, 440.0f, 260.0f, 590.0f);
+	drawRectangle(10.0f, 395.0f, 260.0f, 590.0f);
 
 	// Dashboard title
 	glColor3f(0.40f, 0.90f, 0.60f);
@@ -449,6 +457,20 @@ void drawDashboard()
 		totalPassedVehicles);
 
 	drawText(20.0f, 446.0f, text);
+
+	// Simulation status
+	const char* status = isPaused ? "PAUSED" : "RUNNING";
+
+	snprintf(text, sizeof(text),
+		"Simulation: %s", status);
+
+	drawText(20.0f, 427.0f, text);
+
+	// Simulation speed
+	snprintf(text, sizeof(text),
+		"Speed: %.2fx", simulationSpeed);
+
+	drawText(20.0f, 409.0f, text);
 }
 
 void drawDashboardOverlay()
@@ -1012,6 +1034,40 @@ void setTrafficDensity(TrafficDensity density)
 	spawnTimer = 0.0f;
 }
 
+void resetSimulation()
+{
+	// Remove existing vehicles
+	vehicles.clear();
+
+	// Reset statistics
+	totalPassedVehicles = 0;
+
+	// Reset traffic signals
+	currentPhase = TrafficPhase::NS_GREEN;
+	phaseTimer = 0.0f;
+
+	// Reset traffic mode
+	currentMode = TrafficMode::Automatic;
+	requestedGroup = SignalGroup::NorthSouth;
+
+	// Reset traffic density
+	setTrafficDensity(TrafficDensity::Normal);
+
+	// Reset spawning direction
+	nextSpawnDirection = 0;
+
+	// Reset simulation controls
+	isPaused = false;
+	simulationSpeed = 1.0f;
+
+	// Recalculate initial green duration
+	adaptiveGreenDuration =
+		calculateGreenDuration(SignalGroup::NorthSouth);
+
+	// Reset time reference
+	lastUpdateTime = std::chrono::steady_clock::now();
+}
+
 void updateSpawning(float deltaTime)
 {
 	spawnTimer += deltaTime;
@@ -1172,7 +1228,7 @@ void updateVehicles(float deltaTime)
 
 void update(int value)
 {
-	// Calculate elapsed time
+	// Calculate elapsed real time
 	auto currentTime = std::chrono::steady_clock::now();
 
 	std::chrono::duration<float> elapsed =
@@ -1182,26 +1238,29 @@ void update(int value)
 
 	lastUpdateTime = currentTime;
 
-	// Prevent unusually large movement jumps
-	if (deltaTime > 0.05f)
-		deltaTime = 0.05f;
+	// Prevent large time jumps
+	deltaTime = std::min(deltaTime, 0.05f);
 
-	// Update the automatic traffic light controller
-	updateTrafficLights(deltaTime);
+	// Update simulation only when running
+	if (!isPaused)
+	{
+		// Apply simulation speed
+		float simulationDeltaTime =
+			deltaTime * simulationSpeed;
 
-	// Update vehicle positions
-	updateVehicles(deltaTime);
+		updateTrafficLights(simulationDeltaTime);
 
-	// Remove vehicles that left the scene
-	removeExitedVehicles();
+		updateVehicles(simulationDeltaTime);
 
-	// Spawn new vehicles automatically
-	updateSpawning(deltaTime);
+		removeExitedVehicles();
 
-	// Request a new frame
+		updateSpawning(simulationDeltaTime);
+	}
+
+	// Refresh the display
 	glutPostRedisplay();
 
-	// Schedule the next update
+	// Continue calling the timer
 	glutTimerFunc(16, update, 0);
 }
 
@@ -1243,6 +1302,33 @@ void handleKeyboard(unsigned char key, int x, int y)
 		cameraZoom = DEFAULT_CAMERA_ZOOM;
 
 		updateCameraProjection();
+		break;
+
+	case ' ':
+		// Pause or resume
+		isPaused = !isPaused;
+		break;
+
+	case '[':
+		// Decrease simulation speed
+		simulationSpeed = std::max(
+			MIN_SIMULATION_SPEED,
+			simulationSpeed - SPEED_STEP
+		);
+		break;
+
+	case ']':
+		// Increase simulation speed
+		simulationSpeed = std::min(
+			MAX_SIMULATION_SPEED,
+			simulationSpeed + SPEED_STEP
+		);
+		break;
+
+	case 'r':
+	case 'R':
+		// Reset the simulation
+		resetSimulation();
 		break;
 
 	case 27:
