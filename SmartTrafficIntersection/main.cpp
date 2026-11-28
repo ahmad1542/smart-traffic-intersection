@@ -32,6 +32,8 @@ struct Vehicle
 
 std::vector<Vehicle> vehicles;
 
+int totalPassedVehicles = 0;
+
 // Maximum number of active vehicles
 const int MAX_VEHICLES = 30;
 
@@ -222,7 +224,7 @@ void drawText(float x, float y, const char* text)
 
 	for (const char* character = text; *character; ++character)
 	{
-		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *character);
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *character);
 	}
 }
 
@@ -276,6 +278,28 @@ void drawTrafficModeIndicator()
 	drawText(20.0f, 523.0f, modeText);
 }
 
+const char* getSignalText(SignalGroup group)
+{
+	if (group == SignalGroup::NorthSouth)
+	{
+		if (currentPhase == TrafficPhase::NS_GREEN)
+			return "GREEN";
+
+		if (currentPhase == TrafficPhase::NS_YELLOW)
+			return "YELLOW";
+	}
+	else
+	{
+		if (currentPhase == TrafficPhase::EW_GREEN)
+			return "GREEN";
+
+		if (currentPhase == TrafficPhase::EW_YELLOW)
+			return "YELLOW";
+	}
+
+	return "RED";
+}
+
 void drawAdaptiveIndicator()
 {
 	if (currentMode != TrafficMode::Automatic)
@@ -303,6 +327,111 @@ void drawAdaptiveIndicator()
 
 	glColor3f(1.0f, 1.0f, 1.0f);
 	drawText(20.0f, 478.0f, text);
+}
+
+void drawDashboard()
+{
+	char text[100];
+
+	// Dashboard background
+	glColor3f(0.12f, 0.16f, 0.20f);
+	drawRectangle(10.0f, 440.0f, 260.0f, 590.0f);
+
+	// Dashboard title
+	glColor3f(0.40f, 0.90f, 0.60f);
+	drawText(20.0f, 574.0f, "TRAFFIC MONITOR");
+
+	// Reset text color to white
+	glColor3f(1.0f, 1.0f, 1.0f);
+
+	// Traffic mode
+	const char* mode =
+		currentMode == TrafficMode::Automatic
+		? "AUTOMATIC" : "MANUAL";
+
+	snprintf(text, sizeof(text),
+		"Mode: %s", mode);
+
+	drawText(20.0f, 558.0f, text);
+
+	// Traffic density
+	const char* density = "NORMAL";
+
+	switch (currentDensity)
+	{
+	case TrafficDensity::Low:
+		density = "LOW";
+		break;
+
+	case TrafficDensity::Normal:
+		density = "NORMAL";
+		break;
+
+	case TrafficDensity::High:
+		density = "HIGH";
+		break;
+	}
+
+	snprintf(text, sizeof(text),
+		"Density: %s", density);
+
+	drawText(20.0f, 542.0f, text);
+
+	// North-South signal
+	snprintf(text, sizeof(text),
+		"North-South: %s",
+		getSignalText(SignalGroup::NorthSouth));
+
+	drawText(20.0f, 526.0f, text);
+
+	// East-West signal
+	snprintf(text, sizeof(text),
+		"East-West: %s",
+		getSignalText(SignalGroup::EastWest));
+
+	drawText(20.0f, 510.0f, text);
+
+	// Allocated green duration
+	if (currentMode == TrafficMode::Automatic)
+	{
+		snprintf(text, sizeof(text),
+			"Allocated green: %.1f s",
+			adaptiveGreenDuration);
+	}
+	else
+	{
+		snprintf(text, sizeof(text),
+			"Green timing: MANUAL");
+	}
+
+	drawText(20.0f, 494.0f, text);
+
+	// Number of active vehicles
+	snprintf(text, sizeof(text),
+		"Active vehicles: %zu",
+		vehicles.size());
+
+	drawText(20.0f, 478.0f, text);
+
+	// Waiting vehicles
+	int waitingNS =
+		countWaitingVehicles(SignalGroup::NorthSouth);
+
+	int waitingEW =
+		countWaitingVehicles(SignalGroup::EastWest);
+
+	snprintf(text, sizeof(text),
+		"Waiting: N-S %d | E-W %d",
+		waitingNS, waitingEW);
+
+	drawText(20.0f, 462.0f, text);
+
+	// Total passed vehicles
+	snprintf(text, sizeof(text),
+		"Vehicles passed: %d",
+		totalPassedVehicles);
+
+	drawText(20.0f, 446.0f, text);
 }
 
 // Draw the entire scene
@@ -396,12 +525,8 @@ void display()
 	drawTrafficLight(240.0f, 415.0f, false);
 	drawTrafficLight(560.0f, 185.0f, false);
 	
-	// Draw the traffic density indicator
-	drawDensityIndicator();
-
-	drawTrafficModeIndicator();
-
-	drawAdaptiveIndicator();
+	// Draw the complete monitoring dashboard
+	drawDashboard();
 
 	glutSwapBuffers();
 }
@@ -827,6 +952,9 @@ void updateSpawning(float deltaTime)
 
 void removeExitedVehicles()
 {
+	// Count vehicles before removing exited cars
+	size_t previousCount = vehicles.size();
+
 	vehicles.erase(
 		std::remove_if(
 			vehicles.begin(),
@@ -851,6 +979,10 @@ void removeExitedVehicles()
 				return false;
 			}),
 		vehicles.end());
+
+	// Count how many vehicles have exited
+	totalPassedVehicles +=
+		static_cast<int>(previousCount - vehicles.size());
 }
 
 void updateVehicles(float deltaTime)
