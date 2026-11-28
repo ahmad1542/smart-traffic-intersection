@@ -115,6 +115,16 @@ float car4Speed = 70.0f;
 // Time of the previous update
 auto lastUpdateTime = std::chrono::steady_clock::now();
 
+const float CAMERA_CENTER_X = 400.0f;
+const float CAMERA_CENTER_Y = 300.0f;
+
+// Original half-height was 300.
+// Increasing it to 450 zooms the camera out.
+const float CAMERA_HALF_HEIGHT = 450.0f;
+
+int windowWidth = 800;
+int windowHeight = 600;
+
 void drawRectangle(float x1, float y1, float x2, float y2)
 {
 	glBegin(GL_QUADS);
@@ -434,6 +444,45 @@ void drawDashboard()
 	drawText(20.0f, 446.0f, text);
 }
 
+void drawDashboardOverlay()
+{
+	// Save the world projection
+	glMatrixMode(GL_PROJECTION);
+	glPushMatrix();
+	glLoadIdentity();
+
+	// Use window coordinates for the dashboard
+	glOrtho(0, windowWidth, 0, windowHeight, -1, 1);
+
+	// Save the model-view matrix
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+	glLoadIdentity();
+
+	// Make the dashboard readable on large screens
+	float uiScale = 1.3f;
+
+	// Move the dashboard to the upper-left corner
+	glTranslatef(
+		0.0f,
+		windowHeight - 600.0f * uiScale,
+		0.0f
+	);
+
+	glScalef(uiScale, uiScale, 1.0f);
+
+	// Draw the dashboard
+	drawDashboard();
+
+	// Restore the original matrices
+	glPopMatrix();
+
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+
+	glMatrixMode(GL_MODELVIEW);
+}
+
 // Draw the entire scene
 void display()
 {
@@ -443,37 +492,35 @@ void display()
 	// 1. Draw the roads
 	glColor3f(0.20f, 0.22f, 0.25f);
 
-	// Vertical road
-	drawRectangle(300, 0, 500, 600);
+	// Long vertical road
+	drawRectangle(300, -600, 500, 1200);
 
-	// Horizontal road
-	drawRectangle(0, 200, 800, 400);
+	// Long horizontal road
+	drawRectangle(-800, 200, 1600, 400);
 
-	// 2. Draw yellow center lines
 	glColor3f(1.0f, 0.85f, 0.20f);
 
-	// Vertical road center lines
-	drawRectangle(398, 0, 402, 200);
-	drawRectangle(398, 400, 402, 600);
+	// Vertical center lines
+	drawRectangle(398, -600, 402, 200);
+	drawRectangle(398, 400, 402, 1200);
 
-	// Horizontal road center lines
-	drawRectangle(0, 298, 300, 302);
-	drawRectangle(500, 298, 800, 302);
+	// Horizontal center lines
+	drawRectangle(-800, 298, 300, 302);
+	drawRectangle(500, 298, 1600, 302);
 
-	// 3. Draw white road boundaries
 	glColor3f(1.0f, 1.0f, 1.0f);
 
 	// Vertical boundaries
-	drawRectangle(300, 0, 303, 200);
-	drawRectangle(497, 0, 500, 200);
-	drawRectangle(300, 400, 303, 600);
-	drawRectangle(497, 400, 500, 600);
+	drawRectangle(300, -600, 303, 200);
+	drawRectangle(497, -600, 500, 200);
+	drawRectangle(300, 400, 303, 1200);
+	drawRectangle(497, 400, 500, 1200);
 
 	// Horizontal boundaries
-	drawRectangle(0, 200, 300, 203);
-	drawRectangle(0, 397, 300, 400);
-	drawRectangle(500, 200, 800, 203);
-	drawRectangle(500, 397, 800, 400);
+	drawRectangle(-800, 200, 300, 203);
+	drawRectangle(-800, 397, 300, 400);
+	drawRectangle(500, 200, 1600, 203);
+	drawRectangle(500, 397, 1600, 400);
 
 	// Draw stop lines for right-hand traffic
 	glColor3f(1.0f, 1.0f, 1.0f);
@@ -524,27 +571,38 @@ void display()
 	// East and west traffic lights
 	drawTrafficLight(240.0f, 415.0f, false);
 	drawTrafficLight(560.0f, 185.0f, false);
-	
-	// Draw the complete monitoring dashboard
-	drawDashboard();
+
+	// Draw dashboard independently of the camera
+	drawDashboardOverlay();
 
 	glutSwapBuffers();
 }
 
-
-// Configure the 2D coordinate system
 void reshape(int width, int height)
 {
 	if (height == 0)
 		height = 1;
 
+	windowWidth = width;
+	windowHeight = height;
+
 	glViewport(0, 0, width, height);
+
+	float aspect =
+		static_cast<float>(width) / height;
+
+	float halfWidth = CAMERA_HALF_HEIGHT * aspect;
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 
-	// Keep the scene coordinates fixed
-	glOrtho(0.0, 800.0, 0.0, 600.0, -1.0, 1.0);
+	glOrtho(
+		CAMERA_CENTER_X - halfWidth,
+		CAMERA_CENTER_X + halfWidth,
+		CAMERA_CENTER_Y - CAMERA_HALF_HEIGHT,
+		CAMERA_CENTER_Y + CAMERA_HALF_HEIGHT,
+		-1.0, 1.0
+	);
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
@@ -826,30 +884,30 @@ void spawnVehicle()
 	// Choose the next spawning direction
 	switch (nextSpawnDirection)
 	{
-	case 0:
+	case 0: // Northbound
 		car.direction = Direction::North;
 		car.x = 450.0f;
-		car.y = -50.0f;
+		car.y = -500.0f;
 		car.angle = 0.0f;
 		break;
 
-	case 1:
+	case 1: // Southbound
 		car.direction = Direction::South;
 		car.x = 350.0f;
-		car.y = 650.0f;
+		car.y = 1100.0f;
 		car.angle = 180.0f;
 		break;
 
-	case 2:
+	case 2: // Eastbound
 		car.direction = Direction::East;
-		car.x = -50.0f;
+		car.x = -700.0f;
 		car.y = 250.0f;
 		car.angle = 270.0f;
 		break;
 
-	case 3:
+	case 3: // Westbound
 		car.direction = Direction::West;
-		car.x = 850.0f;
+		car.x = 1500.0f;
 		car.y = 350.0f;
 		car.angle = 90.0f;
 		break;
@@ -964,16 +1022,16 @@ void removeExitedVehicles()
 				switch (car.direction)
 				{
 				case Direction::North:
-					return car.y > 650.0f;
+					return car.y > 1100.0f;
 
 				case Direction::South:
-					return car.y < -50.0f;
+					return car.y < -500.0f;
 
 				case Direction::East:
-					return car.x > 850.0f;
+					return car.x > 1500.0f;
 
 				case Direction::West:
-					return car.x < -50.0f;
+					return car.x < -700.0f;
 				}
 
 				return false;
