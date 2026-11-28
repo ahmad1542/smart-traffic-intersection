@@ -56,12 +56,6 @@ int nextSpawnDirection = 0;
 // Random number generator
 std::mt19937 randomGenerator(std::random_device{}());
 
-const float NORTHBOUND_STOP_Y = 105.0f;
-const float SOUTHBOUND_STOP_Y = 485.0f;
-
-const float EASTBOUND_STOP_X = 205.0f;
-const float WESTBOUND_STOP_X = 595.0f;
-
 const float SAFE_GAP = 15.0f;
 const float CAR_HALF_LENGTH = 35.0f;
 
@@ -78,7 +72,6 @@ enum class TrafficPhase
 TrafficPhase currentPhase = TrafficPhase::NS_GREEN;
 float phaseTimer = 0.0f;
 
-const float GREEN_DURATION = 8.0f;
 const float YELLOW_DURATION = 2.0f;
 const float ALL_RED_DURATION = 1.0f;
 
@@ -105,13 +98,6 @@ float adaptiveGreenDuration = 8.0f;
 // Forward declarations
 int countWaitingVehicles(SignalGroup group);
 float calculateGreenDuration(SignalGroup group);
-
-// Vehicle speeds (units per second)
-float car1Speed = 100.0f;
-float car2Speed = 80.0f;
-
-float car3Speed = 90.0f;
-float car4Speed = 70.0f;
 
 // Time of the previous update
 auto lastUpdateTime = std::chrono::steady_clock::now();
@@ -301,56 +287,6 @@ void drawSignalStatusText(
 	}
 }
 
-void drawDensityIndicator()
-{
-	const char* densityText = "";
-
-	switch (currentDensity)
-	{
-	case TrafficDensity::Low:
-		densityText = "Traffic Density: LOW";
-		break;
-
-	case TrafficDensity::Normal:
-		densityText = "Traffic Density: NORMAL";
-		break;
-
-	case TrafficDensity::High:
-		densityText = "Traffic Density: HIGH";
-		break;
-	}
-
-	// Dark background panel
-	glColor3f(0.12f, 0.16f, 0.20f);
-	drawRectangle(10.0f, 555.0f, 230.0f, 590.0f);
-
-	// White text
-	glColor3f(1.0f, 1.0f, 1.0f);
-	drawText(20.0f, 568.0f, densityText);
-}
-
-void drawTrafficModeIndicator()
-{
-	const char* modeText;
-
-	if (currentMode == TrafficMode::Automatic)
-	{
-		modeText = "Traffic Mode: AUTOMATIC";
-	}
-	else
-	{
-		modeText = "Traffic Mode: MANUAL";
-	}
-
-	// Dark panel
-	glColor3f(0.12f, 0.16f, 0.20f);
-	drawRectangle(10.0f, 510.0f, 230.0f, 545.0f);
-
-	// White text
-	glColor3f(1.0f, 1.0f, 1.0f);
-	drawText(20.0f, 523.0f, modeText);
-}
-
 const char* getSignalText(SignalGroup group)
 {
 	if (group == SignalGroup::NorthSouth)
@@ -371,35 +307,6 @@ const char* getSignalText(SignalGroup group)
 	}
 
 	return "RED";
-}
-
-void drawAdaptiveIndicator()
-{
-	if (currentMode != TrafficMode::Automatic)
-		return;
-
-	int waitingNS =
-		countWaitingVehicles(SignalGroup::NorthSouth);
-
-	int waitingEW =
-		countWaitingVehicles(SignalGroup::EastWest);
-
-	char text[100];
-
-	// Display waiting vehicle counts
-	snprintf(
-		text,
-		sizeof(text),
-		"Waiting: N-S %d | E-W %d",
-		waitingNS,
-		waitingEW
-	);
-
-	glColor3f(0.12f, 0.16f, 0.20f);
-	drawRectangle(10.0f, 465.0f, 260.0f, 500.0f);
-
-	glColor3f(1.0f, 1.0f, 1.0f);
-	drawText(20.0f, 478.0f, text);
 }
 
 void drawDashboard()
@@ -1098,8 +1005,8 @@ void spawnVehicle()
 			std::abs(getProgress(car) - getProgress(other));
 
 		float requiredDistance =
-			35.0f * car.scale +
-			35.0f * other.scale +
+			CAR_HALF_LENGTH * car.scale +
+			CAR_HALF_LENGTH * other.scale +
 			SAFE_GAP;
 
 		if (distance < requiredDistance)
@@ -1257,7 +1164,7 @@ void updateVehicles(float deltaTime)
 
 	for (const Vehicle& car : vehicles)
 	{
-		float halfLength = 35.0f * car.scale;
+		float halfLength = CAR_HALF_LENGTH * car.scale;
 
 		if (car.direction == Direction::North ||
 			car.direction == Direction::South)
@@ -1334,10 +1241,17 @@ void updateVehicles(float deltaTime)
 		float allowedProgress =
 			getAllowedProgress(car, desiredProgress);
 
-		// A vehicle is waiting if its movement was blocked
 		float actualMovement = allowedProgress - currentProgress;
 
-		car.waiting = actualMovement < movement - 0.01f;
+		// Check whether the vehicle is nearly stationary
+		bool isStopped = actualMovement <= 0.01f;
+
+		// Check whether the vehicle is still approaching
+		// the intersection or waiting at its stop line
+		bool isBeforeStopLine = currentProgress <= stopProgress + 0.01f;
+
+		// Count only stopped vehicles in approach queues
+		car.waiting = isStopped && isBeforeStopLine;
 
 		// Update the correct coordinate
 		switch (car.direction)
