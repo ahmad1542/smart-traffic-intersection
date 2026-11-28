@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <vector>
 #include <random>
+#include <cstdio>
 
 enum class Direction
 {
@@ -25,6 +26,8 @@ struct Vehicle
 	float red;
 	float green;
 	float blue;
+
+	bool waiting = false;
 };
 
 std::vector<Vehicle> vehicles;
@@ -93,6 +96,12 @@ TrafficMode currentMode = TrafficMode::Automatic;
 SignalGroup requestedGroup = SignalGroup::NorthSouth;
 
 const float MIN_MANUAL_GREEN = 3.0f;
+
+float adaptiveGreenDuration = 8.0f;
+
+// Forward declarations
+int countWaitingVehicles(SignalGroup group);
+float calculateGreenDuration(SignalGroup group);
 
 // Vehicle speeds (units per second)
 float car1Speed = 100.0f;
@@ -267,6 +276,35 @@ void drawTrafficModeIndicator()
 	drawText(20.0f, 523.0f, modeText);
 }
 
+void drawAdaptiveIndicator()
+{
+	if (currentMode != TrafficMode::Automatic)
+		return;
+
+	int waitingNS =
+		countWaitingVehicles(SignalGroup::NorthSouth);
+
+	int waitingEW =
+		countWaitingVehicles(SignalGroup::EastWest);
+
+	char text[100];
+
+	// Display waiting vehicle counts
+	snprintf(
+		text,
+		sizeof(text),
+		"Waiting: N-S %d | E-W %d",
+		waitingNS,
+		waitingEW
+	);
+
+	glColor3f(0.12f, 0.16f, 0.20f);
+	drawRectangle(10.0f, 465.0f, 260.0f, 500.0f);
+
+	glColor3f(1.0f, 1.0f, 1.0f);
+	drawText(20.0f, 478.0f, text);
+}
+
 // Draw the entire scene
 void display()
 {
@@ -363,6 +401,8 @@ void display()
 
 	drawTrafficModeIndicator();
 
+	drawAdaptiveIndicator();
+
 	glutSwapBuffers();
 }
 
@@ -409,6 +449,18 @@ void toggleTrafficMode()
 	else
 	{
 		currentMode = TrafficMode::Automatic;
+
+		// Calculate adaptive timing for the current green phase
+		if (currentPhase == TrafficPhase::NS_GREEN)
+		{
+			adaptiveGreenDuration = calculateGreenDuration(SignalGroup::NorthSouth);
+			phaseTimer = 0.0f;
+		}
+		else if (currentPhase == TrafficPhase::EW_GREEN)
+		{
+			adaptiveGreenDuration = calculateGreenDuration(SignalGroup::EastWest);
+			phaseTimer = 0.0f;
+		}
 	}
 }
 
@@ -422,6 +474,68 @@ void requestTrafficSignal(SignalGroup group)
 	requestedGroup = group;
 }
 
+int countWaitingVehicles(SignalGroup group)
+{
+	int count = 0;
+
+	for (const Vehicle& car : vehicles)
+	{
+		if (!car.waiting)
+			continue;
+
+		bool northSouth =
+			car.direction == Direction::North ||
+			car.direction == Direction::South;
+
+		if (group == SignalGroup::NorthSouth && northSouth)
+		{
+			count++;
+		}
+		else if (group == SignalGroup::EastWest && !northSouth)
+		{
+			count++;
+		}
+	}
+
+	return count;
+}
+
+const float MIN_GREEN_DURATION = 5.0f;
+const float MAX_GREEN_DURATION = 14.0f;
+const float EXTRA_TIME_PER_CAR = 1.5f;
+
+float calculateGreenDuration(SignalGroup group)
+{
+	int waitingCars = countWaitingVehicles(group);
+
+	float duration =
+		MIN_GREEN_DURATION +
+		waitingCars * EXTRA_TIME_PER_CAR;
+
+	return std::min(duration, MAX_GREEN_DURATION);
+}
+
+void beginTrafficPhase(TrafficPhase nextPhase)
+{
+	currentPhase = nextPhase;
+	phaseTimer = 0.0f;
+
+	// Calculate green duration when automatic mode is active
+	if (currentMode != TrafficMode::Automatic)
+		return;
+
+	if (nextPhase == TrafficPhase::NS_GREEN)
+	{
+		adaptiveGreenDuration =
+			calculateGreenDuration(SignalGroup::NorthSouth);
+	}
+	else if (nextPhase == TrafficPhase::EW_GREEN)
+	{
+		adaptiveGreenDuration =
+			calculateGreenDuration(SignalGroup::EastWest);
+	}
+}
+
 void updateTrafficLights(float deltaTime)
 {
 	phaseTimer += deltaTime;
@@ -432,18 +546,16 @@ void updateTrafficLights(float deltaTime)
 	{
 		if (currentMode == TrafficMode::Automatic)
 		{
-			if (phaseTimer >= GREEN_DURATION)
+			if (phaseTimer >= adaptiveGreenDuration)
 			{
-				currentPhase = TrafficPhase::NS_YELLOW;
-				phaseTimer = 0.0f;
+				beginTrafficPhase(TrafficPhase::NS_YELLOW);
 			}
 		}
 		else if (
 			requestedGroup == SignalGroup::EastWest &&
 			phaseTimer >= MIN_MANUAL_GREEN)
 		{
-			currentPhase = TrafficPhase::NS_YELLOW;
-			phaseTimer = 0.0f;
+			beginTrafficPhase(TrafficPhase::NS_YELLOW);
 		}
 		break;
 	}
@@ -452,8 +564,7 @@ void updateTrafficLights(float deltaTime)
 	{
 		if (phaseTimer >= YELLOW_DURATION)
 		{
-			currentPhase = TrafficPhase::ALL_RED_TO_EW;
-			phaseTimer = 0.0f;
+			beginTrafficPhase(TrafficPhase::ALL_RED_TO_EW);
 		}
 		break;
 	}
@@ -462,8 +573,7 @@ void updateTrafficLights(float deltaTime)
 	{
 		if (phaseTimer >= ALL_RED_DURATION)
 		{
-			currentPhase = TrafficPhase::EW_GREEN;
-			phaseTimer = 0.0f;
+			beginTrafficPhase(TrafficPhase::EW_GREEN);
 		}
 		break;
 	}
@@ -472,18 +582,16 @@ void updateTrafficLights(float deltaTime)
 	{
 		if (currentMode == TrafficMode::Automatic)
 		{
-			if (phaseTimer >= GREEN_DURATION)
+			if (phaseTimer >= adaptiveGreenDuration)
 			{
-				currentPhase = TrafficPhase::EW_YELLOW;
-				phaseTimer = 0.0f;
+				beginTrafficPhase(TrafficPhase::EW_YELLOW);
 			}
 		}
 		else if (
 			requestedGroup == SignalGroup::NorthSouth &&
 			phaseTimer >= MIN_MANUAL_GREEN)
 		{
-			currentPhase = TrafficPhase::EW_YELLOW;
-			phaseTimer = 0.0f;
+			beginTrafficPhase(TrafficPhase::EW_YELLOW);
 		}
 		break;
 	}
@@ -492,8 +600,7 @@ void updateTrafficLights(float deltaTime)
 	{
 		if (phaseTimer >= YELLOW_DURATION)
 		{
-			currentPhase = TrafficPhase::ALL_RED_TO_NS;
-			phaseTimer = 0.0f;
+			beginTrafficPhase(TrafficPhase::ALL_RED_TO_NS);
 		}
 		break;
 	}
@@ -502,8 +609,7 @@ void updateTrafficLights(float deltaTime)
 	{
 		if (phaseTimer >= ALL_RED_DURATION)
 		{
-			currentPhase = TrafficPhase::NS_GREEN;
-			phaseTimer = 0.0f;
+			beginTrafficPhase(TrafficPhase::NS_GREEN);
 		}
 		break;
 	}
@@ -832,6 +938,11 @@ void updateVehicles(float deltaTime)
 		float allowedProgress =
 			getAllowedProgress(car, desiredProgress);
 
+		// A vehicle is waiting if its movement was blocked
+		float actualMovement = allowedProgress - currentProgress;
+
+		car.waiting = actualMovement < movement - 0.01f;
+
 		// Update the correct coordinate
 		switch (car.direction)
 		{
@@ -941,6 +1052,9 @@ int main(int argc, char** argv)
 
 	// Create the window
 	glutCreateWindow("Smart Traffic Intersection");
+
+	// Initialize adaptive traffic light timing
+	adaptiveGreenDuration = calculateGreenDuration(SignalGroup::NorthSouth);
 
 	// Set the background to green
 	glClearColor(0.25f, 0.55f, 0.30f, 1.0f);
